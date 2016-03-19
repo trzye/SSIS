@@ -68,9 +68,15 @@ CREATE TABLE imp(
 		constraint pk_imported_rows primary key,
 	imp_status nvarchar(20) not null 
 		default 'not processed', -- not processed, imported, duplicated
-	master_id nvarchar(16) not null
+	master_id nvarchar(16) null
 		constraint fk_imported_rows__gracz foreign key 
-		references gracz(nick)
+		references gracz(nick),
+	wlasciciel nvarchar(16) not null,
+	nazwa nvarchar(32) not null,
+	zasieg int not null,
+	atak int not null,
+	obrona int not null,
+	szybkosc int not null
 )-- tabelka tymczasowa do importuCREATE TABLE imp_tmp(
 	wlasciciel nvarchar(16) not null,
 	nazwa nvarchar(32) not null,
@@ -99,12 +105,12 @@ INSERT INTO statek(wlasciciel, nazwa) VALUES('Gracz2', 'Statek2b')
 INSERT INTO statek(wlasciciel, nazwa) VALUES('Gracz2', 'Statek2c')
 
 -- sprawdzenie czy siê poprawnie doda³o
-
+/*
 select * from statek
 	join gracz on gracz.nick = statek.wlasciciel
 	order by wlasciciel
-
-/* rezultat
+*/
+/* rezultat powinien byæ taki:
 id_statku   wlasciciel       nazwa                            zasieg      atak        obrona      szybkosc    nick             haslo
 ----------- ---------------- -------------------------------- ----------- ----------- ----------- ----------- ---------------- ----------------
 2           Gracz1           Statek1a                         0           0           0           0           Gracz1           niezaszyfrowane1
