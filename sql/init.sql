@@ -53,14 +53,16 @@ CREATE TABLE LOG(
 )
 
 CREATE TABLE imp( 
-	imp_id int not null identity 
+	imp_id int not null identity
 		constraint pk_imp primary key,
 	start_dt datetime not null default getdate(),
 	end_dt datetime null, -- jak nie null to sie zakonczyl
-	err_no int not null default -1, -- in progres, 0 – finished 
+	err_no int not null default 0, --liczba b³êdów
 	usr_nam nvarchar(100) not null default user_name(),
 	host nvarchar(100) not null default host_name()
-)CREATE TABLE imported_rows(
+)
+
+CREATE TABLE imported_rows(
 	imp_id int not null 
 		constraint fk_ir_imp foreign key 
 		references imp(imp_id), -- czyli link do importu 
@@ -77,7 +79,11 @@ CREATE TABLE imp(
 	atak int not null,
 	obrona int not null,
 	szybkosc int not null
-)-- tabelka tymczasowa do importuCREATE TABLE imp_tmp(
+)
+
+-- tabelka tymczasowa do importu
+
+CREATE TABLE imp_tmp(
 	wlasciciel nvarchar(16) not null,
 	nazwa nvarchar(32) not null,
 	zasieg int not null,
@@ -104,6 +110,8 @@ INSERT INTO statek(wlasciciel, nazwa) VALUES('Gracz2', 'Statek2a')
 INSERT INTO statek(wlasciciel, nazwa) VALUES('Gracz2', 'Statek2b')
 INSERT INTO statek(wlasciciel, nazwa) VALUES('Gracz2', 'Statek2c')
 
+go
+
 -- sprawdzenie czy siê poprawnie doda³o
 /*
 select * from statek
@@ -120,3 +128,123 @@ id_statku   wlasciciel       nazwa                            zasieg      atak  
 6           Gracz2           Statek2c                         0           0           0           0           Gracz2           jestemfajny
 1           H@X00r           Sokó³ Milennium                  999         999         999         999         H@X00r           T5V|]NeH4$|_O
 */
+
+
+
+-- Przepisywanie danych z imp_tmp do imported_rows
+
+create procedure przepisanie_danych as
+BEGIN
+	insert into LOG(proc_name, msg, step_name) values('Przepisywanie danych do imported rows','OK', 'rozpoczêcie')
+	insert into imp default values
+	insert into 
+		imported_rows(imp_id, wlasciciel, nazwa, zasieg, atak, obrona, szybkosc)
+	select SCOPE_IDENTITY(), wlasciciel, nazwa, zasieg, atak, obrona, szybkosc
+		from imp_tmp
+	insert into LOG(proc_name, msg, step_name) values('Przepisywanie danych do imported rows','OK', 'zakoñczono')
+END
+GO
+
+-- procesowanie danych z imported rows (o statusie 'not processed')
+-- poprawne przypadki:
+--	podany w³aœciciel istnieje -> wtedy dodajemy dla niego nowy statek
+--	podany w³aœciciel nie istnieje -> dodajemy nowego gracza i nowy statek
+-- mo¿liwe b³êdy:
+--	statek o danej nazwie ju¿ istnieje 
+--	(je¿eli tak, to nie powinniœmy dodawaæ nowego gracza!)
+
+create procedure procesowanie_danych as
+	insert into LOG(proc_name, msg, step_name) values('Procesowanie danych z imported rows','OK', 'rozpoczêcie')
+
+	DECLARE @RowId int
+
+	DECLARE MY_CURSOR CURSOR 
+	  LOCAL STATIC READ_ONLY FORWARD_ONLY
+	FOR 
+	SELECT DISTINCT row_id
+	FROM imported_rows
+	WHERE imp_status = 'not processed'
+
+	OPEN MY_CURSOR
+	FETCH NEXT FROM MY_CURSOR INTO @RowId
+	WHILE @@FETCH_STATUS = 0
+	BEGIN 
+		
+		IF
+		(select s.nazwa from statek s
+		 join imported_rows ir on ir.nazwa = s.nazwa
+		 where ir.row_id = @RowId
+		) is not null
+		BEGIN 
+			insert into LOG(proc_name, msg, step_name) values('Procesowanie danych z imported rows','ERROR - statek o podanej nazwie juz istnieje', 'Row: ' + CONVERT(varchar(10), @RowId) )
+			update imported_rows
+				set imp_status = 'duplicated'
+			where imported_rows.row_id = @RowId
+			update imp
+				set err_no = err_no + 1
+			where imp_id = 
+				( select imp_id from imported_rows 
+				  where row_id = @RowId)
+		END
+		ELSE
+		BEGIN
+			insert into LOG(proc_name, msg, step_name) values('Procesowanie danych z imported rows','OK - nie istnieje statek o podanej nazwie', 'Row: ' + CONVERT(varchar(10), @RowId) )
+			IF
+			(select g.nick from gracz g
+			 join imported_rows ir on ir.wlasciciel = g.nick
+			 where ir.row_id = @RowId
+			) is null
+			BEGIN
+				insert into LOG(proc_name, msg, step_name) values('Procesowanie danych z imported rows','OK - podany gracz nie istnieje, tworzê nowego', 'Row: ' + CONVERT(varchar(10), @RowId) )
+				insert into gracz values(
+					(select wlasciciel from imported_rows 
+					where row_id = @RowId),
+					(select wlasciciel from imported_rows 
+					where row_id = @RowId)
+				)
+				insert into LOG(proc_name, msg, step_name) values('Procesowanie danych z imported rows','OK - gracz zosta³ utworzony', 'Row: ' + CONVERT(varchar(10), @RowId) )
+			END
+			insert into statek 
+				select wlasciciel, nazwa, zasieg, atak, obrona, szybkosc
+				from imported_rows where row_id = @RowId
+
+			update imported_rows
+				set imp_status = 'imported'
+			where imported_rows.row_id = @RowId
+
+			update imported_rows
+				set master_id = wlasciciel
+			where imported_rows.row_id = @RowId
+
+			insert into LOG(proc_name, msg, step_name) values('Procesowanie danych z imported rows','OK - statek zosta³ dodany', 'Row: ' + CONVERT(varchar(10), @RowId) )
+		END
+
+		
+		FETCH NEXT FROM MY_CURSOR INTO @RowId
+	END
+	CLOSE MY_CURSOR
+	DEALLOCATE MY_CURSOR
+
+	update imp
+		set end_dt = GETDATE()
+	where end_dt is null
+
+	insert into LOG(proc_name, msg, step_name) values('Procesowanie danych z imported rows','OK', 'zakoñczone')
+
+go
+
+select * from log
+select * from imported_rows
+select * from imp
+
+
+execute procesowanie_danych
+
+
+
+
+	EXEC msdb.dbo.sp_send_dbmail
+    @profile_name = 'Adventure Works Administrator',
+    @recipients = 'michal.jereczek@gmail.com',
+    @body = 'The stored procedure finished successfully.',
+    @subject = 'Automated Success Message' ;
