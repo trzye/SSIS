@@ -1,3 +1,47 @@
+ï»¿-- Tworzenie serwisu mailowego
+
+    
+/* Usuwanie danych o serwisie
+	EXEC msdb.dbo.sysmail_delete_profile_sp
+	  @profile_name = 'Error mail service'
+
+	EXEC msdb.dbo.sysmail_delete_account_sp
+	  @account_name = 'Error mail service: Space Game'
+*/
+
+    EXEC msdb.dbo.sysmail_add_profile_sp
+      @profile_name = 'Error mail service',
+      @description = 'Sending emails to admins'
+
+	
+    EXEC msdb.dbo.sysmail_add_account_sp
+      @account_name = 'Error mail service: Space Game',
+      @description = 'mail used to send informations about errors',
+      @email_address = 'space.game.noreply@gmail.com',
+      @display_name = 'Error mail service: Space Game',
+      @mailserver_name = 'smtp.gmail.com',
+      @port = 587,
+      @use_default_credentials = 0,
+	  @username = 'space.game.noreply@gmail.com',
+	  @password = 'spacegamenoreply',
+	  @enable_ssl = 1
+    
+    EXEC msdb.dbo.sysmail_add_profileaccount_sp 
+      @profile_name = 'Error mail service',
+      @account_name = 'Error mail service: Space Game',
+      @sequence_number = 1
+
+/* Testowy email 
+	USE [msdb]
+    EXEC sp_send_dbmail
+      @profile_name = 'Error mail service',
+      @recipients = 'michal.jereczek@gmail.com',
+      @subject = 'Test',
+      @body = 'Test maila, nie odpisywaÄ‡ :-)'
+*/
+
+GO
+
 -- Tworzenie bazy danych
 
 USE master
@@ -9,9 +53,9 @@ CREATE DATABASE space_game_db
 
 GO
 
--- Wype³nianie bazy tabelami
+-- WypeÅ‚nianie bazy tabelami
 --	Baza danych przechowuje przede wszystkim graczy oraz statki kosmiczne,
---	które s¹ do nich przypisane.
+--	ktÃ³re sÄ… do nich przypisane.
 
 USE space_game_db
 
@@ -34,7 +78,7 @@ CREATE TABLE statek(
 	szybkosc int not null default 0
 )
 
--- reszta tabelek zgodnie z proœb¹ w instrukcji do projektu
+-- reszta tabelek zgodnie z proÅ›bÄ… w instrukcji do projektu
 
 CREATE TABLE usr(
 	usr_id int not null identity
@@ -57,7 +101,7 @@ CREATE TABLE imp(
 		constraint pk_imp primary key,
 	start_dt datetime not null default getdate(),
 	end_dt datetime null, -- jak nie null to sie zakonczyl
-	err_no int not null default 0, --liczba b³êdów
+	err_no int not null default 0, --liczba bÅ‚Ä™dÃ³w
 	usr_nam nvarchar(100) not null default user_name(),
 	host nvarchar(100) not null default host_name()
 )
@@ -98,10 +142,10 @@ INSERT INTO gracz VALUES('Gracz1', 'niezaszyfrowane1')
 INSERT INTO gracz VALUES('Gracz2', 'jestemfajny')
 INSERT INTO gracz VALUES('H@X00r', 'T5V|]NeH4$|_O')
 
--- dodanie kilku statków
+-- dodanie kilku statkÃ³w
 
 INSERT INTO statek(wlasciciel, nazwa, szybkosc, atak, obrona, zasieg)
-	VALUES('H@X00r', 'Sokó³ Milennium', 999, 999, 999, 999)
+	VALUES('H@X00r', 'SokÃ³Å‚ Milennium', 999, 999, 999, 999)
 
 INSERT INTO statek(wlasciciel, nazwa) VALUES('Gracz1', 'Statek1a')
 INSERT INTO statek(wlasciciel, nazwa) VALUES('Gracz1', 'Statek1b')
@@ -112,13 +156,13 @@ INSERT INTO statek(wlasciciel, nazwa) VALUES('Gracz2', 'Statek2c')
 
 go
 
--- sprawdzenie czy siê poprawnie doda³o
+-- sprawdzenie czy siÄ™ poprawnie dodaÅ‚o
 /*
 select * from statek
 	join gracz on gracz.nick = statek.wlasciciel
 	order by wlasciciel
 */
-/* rezultat powinien byæ taki:
+/* rezultat powinien byÄ‡ taki:
 id_statku   wlasciciel       nazwa                            zasieg      atak        obrona      szybkosc    nick             haslo
 ----------- ---------------- -------------------------------- ----------- ----------- ----------- ----------- ---------------- ----------------
 2           Gracz1           Statek1a                         0           0           0           0           Gracz1           niezaszyfrowane1
@@ -126,7 +170,7 @@ id_statku   wlasciciel       nazwa                            zasieg      atak  
 4           Gracz2           Statek2a                         0           0           0           0           Gracz2           jestemfajny
 5           Gracz2           Statek2b                         0           0           0           0           Gracz2           jestemfajny
 6           Gracz2           Statek2c                         0           0           0           0           Gracz2           jestemfajny
-1           H@X00r           Sokó³ Milennium                  999         999         999         999         H@X00r           T5V|]NeH4$|_O
+1           H@X00r           SokÃ³Å‚ Milennium                  999         999         999         999         H@X00r           T5V|]NeH4$|_O
 */
 
 
@@ -135,26 +179,26 @@ id_statku   wlasciciel       nazwa                            zasieg      atak  
 
 create procedure przepisanie_danych as
 BEGIN
-	insert into LOG(proc_name, msg, step_name) values('Przepisywanie danych do imported rows','OK', 'rozpoczêcie')
+	insert into LOG(proc_name, msg, step_name) values('Przepisywanie danych do imported rows','OK', 'rozpoczÄ™cie')
 	insert into imp default values
 	insert into 
 		imported_rows(imp_id, wlasciciel, nazwa, zasieg, atak, obrona, szybkosc)
 	select SCOPE_IDENTITY(), wlasciciel, nazwa, zasieg, atak, obrona, szybkosc
 		from imp_tmp
-	insert into LOG(proc_name, msg, step_name) values('Przepisywanie danych do imported rows','OK', 'zakoñczono')
+	insert into LOG(proc_name, msg, step_name) values('Przepisywanie danych do imported rows','OK', 'zakoÅ„czono')
 END
 GO
 
 -- procesowanie danych z imported rows (o statusie 'not processed')
 -- poprawne przypadki:
---	podany w³aœciciel istnieje -> wtedy dodajemy dla niego nowy statek
---	podany w³aœciciel nie istnieje -> dodajemy nowego gracza i nowy statek
--- mo¿liwe b³êdy:
---	statek o danej nazwie ju¿ istnieje 
---	(je¿eli tak, to nie powinniœmy dodawaæ nowego gracza!)
+--	podany wÅ‚aÅ›ciciel istnieje -> wtedy dodajemy dla niego nowy statek
+--	podany wÅ‚aÅ›ciciel nie istnieje -> dodajemy nowego gracza i nowy statek
+-- moÅ¼liwe bÅ‚Ä™dy:
+--	statek o danej nazwie juÅ¼ istnieje 
+--	(jeÅ¼eli tak, to nie powinniÅ›my dodawaÄ‡ nowego gracza!)
 
 create procedure procesowanie_danych as
-	insert into LOG(proc_name, msg, step_name) values('Procesowanie danych z imported rows','OK', 'rozpoczêcie')
+	insert into LOG(proc_name, msg, step_name) values('Procesowanie danych z imported rows','OK', 'rozpoczÄ™cie')
 
 	DECLARE @RowId int
 
@@ -165,11 +209,13 @@ create procedure procesowanie_danych as
 	FROM imported_rows
 	WHERE imp_status = 'not processed'
 
+	-- PÄ™tla, w ktÃ³rej procesujemy kolejno nieprzeprocesowane rekordy
 	OPEN MY_CURSOR
 	FETCH NEXT FROM MY_CURSOR INTO @RowId
 	WHILE @@FETCH_STATUS = 0
 	BEGIN 
 		
+		-- Sprawdzam czy statek juÅ¼ istnieje, jak tak to zgÅ‚aszam bÅ‚Ä…d
 		IF
 		(select s.nazwa from statek s
 		 join imported_rows ir on ir.nazwa = s.nazwa
@@ -186,24 +232,28 @@ create procedure procesowanie_danych as
 				( select imp_id from imported_rows 
 				  where row_id = @RowId)
 		END
+		-- w innym wypadku procesujemy taki statek
 		ELSE
 		BEGIN
+			-- sprawdzam czy istnieje gracz dla podanego statku
 			insert into LOG(proc_name, msg, step_name) values('Procesowanie danych z imported rows','OK - nie istnieje statek o podanej nazwie', 'Row: ' + CONVERT(varchar(10), @RowId) )
 			IF
 			(select g.nick from gracz g
 			 join imported_rows ir on ir.wlasciciel = g.nick
 			 where ir.row_id = @RowId
 			) is null
+			-- jeÅ¼eli nie istnieje to dodajÄ™ go
 			BEGIN
-				insert into LOG(proc_name, msg, step_name) values('Procesowanie danych z imported rows','OK - podany gracz nie istnieje, tworzê nowego', 'Row: ' + CONVERT(varchar(10), @RowId) )
+				insert into LOG(proc_name, msg, step_name) values('Procesowanie danych z imported rows','OK - podany gracz nie istnieje, tworzÄ™ nowego', 'Row: ' + CONVERT(varchar(10), @RowId) )
 				insert into gracz values(
 					(select wlasciciel from imported_rows 
 					where row_id = @RowId),
 					(select wlasciciel from imported_rows 
 					where row_id = @RowId)
 				)
-				insert into LOG(proc_name, msg, step_name) values('Procesowanie danych z imported rows','OK - gracz zosta³ utworzony', 'Row: ' + CONVERT(varchar(10), @RowId) )
+				insert into LOG(proc_name, msg, step_name) values('Procesowanie danych z imported rows','OK - gracz zostaÅ‚ utworzony', 'Row: ' + CONVERT(varchar(10), @RowId) )
 			END
+			-- teraz mogÄ™ dodaÄ‡ statek
 			insert into statek 
 				select wlasciciel, nazwa, zasieg, atak, obrona, szybkosc
 				from imported_rows where row_id = @RowId
@@ -216,7 +266,7 @@ create procedure procesowanie_danych as
 				set master_id = wlasciciel
 			where imported_rows.row_id = @RowId
 
-			insert into LOG(proc_name, msg, step_name) values('Procesowanie danych z imported rows','OK - statek zosta³ dodany', 'Row: ' + CONVERT(varchar(10), @RowId) )
+			insert into LOG(proc_name, msg, step_name) values('Procesowanie danych z imported rows','OK - statek zostaÅ‚ dodany', 'Row: ' + CONVERT(varchar(10), @RowId) )
 		END
 
 		
@@ -225,26 +275,24 @@ create procedure procesowanie_danych as
 	CLOSE MY_CURSOR
 	DEALLOCATE MY_CURSOR
 
+	-- sprawdzam czy wystÄ…piÅ‚y jakieÅ› bÅ‚Ä™dy i wysyÅ‚am maile do administratorÃ³w, jeÅ¼eli takie sÄ…
+	IF (select sum(err_no) from imp where end_dt is null) > 0 
+	BEGIN
+		EXEC msdb.dbo.sp_send_dbmail
+		  @profile_name = 'Error mail service',
+		  @recipients = 'michal.jereczek@gmail.com',
+		  @subject = 'BÅ‚Ä™dy w pakiecie',
+		  @body = 'WystÄ…piÅ‚y bÅ‚Ä™dy w pakiecie'
+	END
+
 	update imp
 		set end_dt = GETDATE()
 	where end_dt is null
 
-	insert into LOG(proc_name, msg, step_name) values('Procesowanie danych z imported rows','OK', 'zakoñczone')
+	insert into LOG(proc_name, msg, step_name) values('Procesowanie danych z imported rows','OK', 'zakoÅ„czone')
 
 go
 
 select * from log
 select * from imported_rows
 select * from imp
-
-
-execute procesowanie_danych
-
-
-
-
-	EXEC msdb.dbo.sp_send_dbmail
-    @profile_name = 'Adventure Works Administrator',
-    @recipients = 'michal.jereczek@gmail.com',
-    @body = 'The stored procedure finished successfully.',
-    @subject = 'Automated Success Message' ;
