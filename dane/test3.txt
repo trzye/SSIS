@@ -1,0 +1,2 @@
+WLASCICIEL;STATEK;ZASIxxEG;ATAK;OBRONA;SZYBKOSC
+Gracz1;Now;lalala;lalala;lalal

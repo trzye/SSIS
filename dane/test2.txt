@@ -1,0 +1,5 @@
+WLASCICIEL;STATEK;ZASIEG;ATAK;OBRONA;SZYBKOSC
+Gracz1;NowszyStatek1;0;1;2;3	
+Gracz2;NowyStatek2;10;11;12;13	
+NowyGracz;NowszyStatek3;20;21;22;23	
+H@X00r;Œcigacz;111;333;333;999
